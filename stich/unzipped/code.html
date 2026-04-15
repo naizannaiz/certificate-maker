@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Sovereign Atelier | Premium Certificate Maker</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Noto+Serif:ital,wght@0,400;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "on-primary-fixed": "#20005f",
+                "on-primary-fixed-variant": "#4f00d0",
+                "on-tertiary-fixed": "#320046",
+                "outline": "#948ea1",
+                "error-container": "#93000a",
+                "error": "#ffb4ab",
+                "inverse-surface": "#e4e0f2",
+                "outline-variant": "#494455",
+                "surface-container-high": "#2a2836",
+                "tertiary-fixed-dim": "#edb1ff",
+                "surface-container-highest": "#353341",
+                "tertiary-container": "#9e51bc",
+                "surface-container-lowest": "#0e0d19",
+                "secondary-fixed-dim": "#e9c349",
+                "secondary": "#e9c349",
+                "tertiary": "#edb1ff",
+                "on-secondary": "#3c2f00",
+                "secondary-fixed": "#ffe088",
+                "on-error": "#690005",
+                "surface": "#13121e",
+                "surface-container-low": "#1b1a27",
+                "secondary-container": "#af8d11",
+                "surface-container": "#1f1e2b",
+                "on-error-container": "#ffdad6",
+                "primary-fixed-dim": "#cdbdff",
+                "on-primary-container": "#fcf6ff",
+                "on-secondary-fixed-variant": "#574500",
+                "surface-variant": "#353341",
+                "on-tertiary": "#520070",
+                "surface-bright": "#393845",
+                "inverse-primary": "#6833ea",
+                "on-secondary-fixed": "#241a00",
+                "on-tertiary-fixed-variant": "#6e208c",
+                "on-primary": "#370096",
+                "on-surface-variant": "#cac3d8",
+                "background": "#13121e",
+                "primary-fixed": "#e8deff",
+                "surface-dim": "#13121e",
+                "on-surface": "#e4e0f2",
+                "tertiary-fixed": "#f9d8ff",
+                "on-secondary-container": "#342800",
+                "inverse-on-surface": "#302f3c",
+                "primary-container": "#7c4dff",
+                "primary": "#cdbdff",
+                "on-tertiary-container": "#fff6fc",
+                "on-background": "#e4e0f2",
+                "surface-tint": "#cdbdff"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+            },
+            "fontFamily": {
+                "headline": ["Noto Serif"],
+                "body": ["Inter"],
+                "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(53, 51, 65, 0.4);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(148, 142, 161, 0.15);
+        }
+        .certificate-shadow {
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 10px rgba(233, 195, 73, 0.1);
+        }
+        .primary-gradient-btn {
+            background: linear-gradient(135deg, #cdbdff 0%, #7c4dff 100%);
+        }
+        .gold-ornament {
+            color: #e9c349;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30">
+<!-- TopNavBar Shell -->
+<header class="w-full h-16 sticky top-0 z-50 bg-[#13121e]/60 backdrop-blur-md flex justify-between items-center px-8 border-b border-white/5">
+<div class="text-2xl font-serif tracking-tighter text-[#e9c349]">The Sovereign Atelier</div>
+<nav class="hidden md:flex space-x-8 items-center">
+<a class="text-[#cac3d8] hover:text-white font-label text-[10px] uppercase tracking-widest transition-all" href="#">Drafts</a>
+<a class="text-[#cac3d8] hover:text-white font-label text-[10px] uppercase tracking-widest transition-all" href="#">Archive</a>
+<a class="text-[#cdbdff] border-b border-[#cdbdff] pb-1 font-label text-[10px] uppercase tracking-widest" href="#">Premium</a>
+</nav>
+<div class="flex items-center space-x-6">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="h-8 w-px bg-white/10"></div>
+<button class="bg-secondary/10 border border-secondary/20 px-4 py-1.5 rounded-lg text-secondary font-label text-xs uppercase tracking-wider hover:bg-secondary hover:text-on-secondary transition-all">
+                Export Masterpiece
+            </button>
+<img alt="Artisan Profile" class="w-8 h-8 rounded-full border border-white/10" data-alt="portrait of a professional creative director in a dark studio setting with soft rim lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnfpTiE7RLPlrnFjdrOVJQLHElYX0kzgr9VPCwxoDF8qow9uhNyfcMzhLrWOGm-rQ322DBmn3lvYwL4j6PmPIV5UStt_-xtlRS6MUHTcV5VFB8UQYFB6rXZTyk6EA79yaFCOTfb85PB9keNhYLIjSwYZNc9cFrSQqDpqoFJJz9CzrUuRYH6ehNpEcpHd1Cr01nH4feNCRADSt29fzoJGt79wUj-UFq6S1j2P9sIFtSsolxyY6jpx6aEXd6m3AMkfxPrSv8S5eiJ6P9"/>
+</div>
+</header>
+<div class="flex min-h-[calc(100vh-4rem)]">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-4rem)] w-20 md:w-64 bg-[#0e0d19]/80 backdrop-blur-xl border-r border-white/5 flex flex-col z-40">
+<div class="p-6 hidden md:block">
+<p class="font-label uppercase tracking-[0.2em] text-[10px] text-on-surface-variant">Master Artisan</p>
+<h2 class="font-headline italic text-[#e9c349] text-xl mt-1">The Atelier</h2>
+</div>
+<nav class="flex-1 px-4 space-y-2 mt-4">
+<a class="flex items-center space-x-4 p-3 rounded-xl transition-all duration-300 text-[#cac3d8] opacity-60 hover:bg-white/10 hover:text-[#cdbdff] hover:opacity-100" href="#">
+<span class="material-symbols-outlined">edit_note</span>
+<span class="hidden md:block font-label uppercase tracking-widest text-[10px]">Workshop</span>
+</a>
+<a class="flex items-center space-x-4 p-3 rounded-xl transition-all duration-300 text-[#cdbdff] border-r-2 border-[#cdbdff] bg-white/5" href="#">
+<span class="material-symbols-outlined">auto_awesome</span>
+<span class="hidden md:block font-label uppercase tracking-widest text-[10px]">Templates</span>
+</a>
+<a class="flex items-center space-x-4 p-3 rounded-xl transition-all duration-300 text-[#cac3d8] opacity-60 hover:bg-white/10 hover:text-[#cdbdff] hover:opacity-100" href="#">
+<span class="material-symbols-outlined">workspace_premium</span>
+<span class="hidden md:block font-label uppercase tracking-widest text-[10px]">Gallery</span>
+</a>
+<a class="flex items-center space-x-4 p-3 rounded-xl transition-all duration-300 text-[#cac3d8] opacity-60 hover:bg-white/10 hover:text-[#cdbdff] hover:opacity-100" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="hidden md:block font-label uppercase tracking-widest text-[10px]">Settings</span>
+</a>
+</nav>
+<div class="p-4 mt-auto">
+<button class="w-full primary-gradient-btn text-on-primary-fixed font-label uppercase tracking-widest text-[10px] font-bold py-3 rounded-lg flex items-center justify-center space-x-2 shadow-lg shadow-primary/20 scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-sm">add</span>
+<span class="hidden md:block">New Certificate</span>
+</button>
+</div>
+</aside>
+<!-- Main Workspace Canvas -->
+<main class="flex-1 ml-20 md:ml-64 p-8 grid grid-cols-1 xl:grid-cols-12 gap-12 bg-surface">
+<!-- LEFT PANEL: User Details Form -->
+<section class="xl:col-span-5 space-y-8">
+<div class="glass-panel p-10 rounded-2xl shadow-[20px_0_40px_rgba(124,77,255,0.08)]">
+<div class="mb-10">
+<span class="font-label uppercase tracking-[0.3em] text-[10px] text-primary mb-2 block">Creation Suite</span>
+<h1 class="font-headline text-4xl text-on-surface leading-tight">Create Your <br/><span class="italic text-secondary">Certificate</span></h1>
+</div>
+<form class="space-y-6">
+<div class="group">
+<div class="flex items-center justify-between mb-2">
+<label class="font-label uppercase tracking-widest text-[10px] text-on-surface-variant">Recipient Full Name</label>
+<span class="material-symbols-outlined text-primary text-sm">person</span>
+</div>
+<input class="w-full bg-surface-container-highest/40 border border-outline-variant/30 rounded-lg px-4 py-3.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all" placeholder="e.g. Julian Vane" type="text"/>
+</div>
+<div class="group">
+<div class="flex items-center justify-between mb-2">
+<label class="font-label uppercase tracking-widest text-[10px] text-on-surface-variant">Mobile Number</label>
+<span class="material-symbols-outlined text-primary text-sm">call</span>
+</div>
+<input class="w-full bg-surface-container-highest/40 border border-outline-variant/30 rounded-lg px-4 py-3.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all" placeholder="+1 (555) 000-0000" type="tel"/>
+</div>
+<div class="group">
+<div class="flex items-center justify-between mb-2">
+<label class="font-label uppercase tracking-widest text-[10px] text-on-surface-variant">Email Address</label>
+<span class="material-symbols-outlined text-primary text-sm">mail</span>
+</div>
+<input class="w-full bg-surface-container-highest/40 border border-outline-variant/30 rounded-lg px-4 py-3.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all" placeholder="artisan@atelier.com" type="email"/>
+</div>
+<button class="w-full primary-gradient-btn mt-8 text-on-primary-fixed py-4 rounded-lg font-label uppercase tracking-widest text-xs font-bold hover:shadow-[0_0_20px_rgba(205,189,255,0.4)] transition-all active:scale-[0.98]" type="button">
+                            Generate Certificate
+                        </button>
+</form>
+</div>
+<!-- Decorative Asset -->
+<div class="relative overflow-hidden h-48 rounded-2xl border border-white/5 bg-surface-container-low p-6">
+<div class="relative z-10">
+<h4 class="font-headline text-lg text-secondary">Artisan Ethics</h4>
+<p class="text-on-surface-variant text-sm mt-2 max-w-[240px]">Each document issued through the Sovereign Atelier carries the weight of digital authenticity.</p>
+</div>
+<span class="material-symbols-outlined absolute -bottom-8 -right-8 text-[160px] opacity-5 text-primary rotate-12">verified_user</span>
+</div>
+</section>
+<!-- RIGHT PANEL: Certificate Preview -->
+<section class="xl:col-span-7 flex flex-col items-center">
+<div class="sticky top-24 w-full flex flex-col items-center">
+<!-- A4 Ratio Certificate -->
+<div class="w-full aspect-[1/1.414] max-w-[600px] bg-[#fcfaf2] p-8 certificate-shadow relative border-[12px] border-[#e9c349]">
+<!-- Inset double line border -->
+<div class="h-full w-full border-[1px] border-[#e9c349] p-1">
+<div class="h-full w-full border-[1px] border-[#e9c349] p-12 flex flex-col items-center text-center relative">
+<!-- Corner Ornaments -->
+<div class="absolute top-2 left-2 text-secondary scale-150">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">filter_frames</span>
+</div>
+<div class="absolute top-2 right-2 text-secondary scale-150 -rotate-90">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">filter_frames</span>
+</div>
+<div class="absolute bottom-2 left-2 text-secondary scale-150 rotate-90">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">filter_frames</span>
+</div>
+<div class="absolute bottom-2 right-2 text-secondary scale-150 rotate-180">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">filter_frames</span>
+</div>
+<!-- Content -->
+<div class="mt-8">
+<span class="material-symbols-outlined text-secondary text-5xl mb-4" style="font-variation-settings: 'FILL' 1;">military_tech</span>
+<h2 class="font-headline text-4xl text-[#13121e] uppercase tracking-widest font-bold">Certificate</h2>
+<p class="font-headline text-xl text-[#13121e]/70 mt-1 italic">of Achievement</p>
+</div>
+<div class="mt-16 space-y-4">
+<p class="font-headline text-[#353341] italic">This is to certify that</p>
+<h3 class="font-headline text-5xl text-secondary py-4 px-8 border-b-2 border-secondary/20 min-w-[300px]">Julian Vane</h3>
+<p class="font-headline text-lg text-[#353341] mt-6">has successfully completed the program</p>
+<p class="font-headline font-bold text-xl text-[#13121e] tracking-tight uppercase mt-2">Mastery of Digital Craftsmanship</p>
+</div>
+<!-- Signature & Date Section -->
+<div class="mt-auto w-full grid grid-cols-2 gap-20 pb-8">
+<div class="text-center">
+<div class="border-b border-[#13121e]/40 h-10 mb-2 flex items-end justify-center px-4">
+<span class="font-headline italic text-2xl text-[#13121e]/80">Elias Thorne</span>
+</div>
+<p class="font-label uppercase tracking-widest text-[9px] text-[#353341]">Atelier Director</p>
+</div>
+<div class="text-center">
+<div class="border-b border-[#13121e]/40 h-10 mb-2 flex items-end justify-center">
+<span class="font-headline text-lg text-[#13121e]">October 24, 2023</span>
+</div>
+<p class="font-label uppercase tracking-widest text-[9px] text-[#353341]">Date of Issue</p>
+</div>
+</div>
+<!-- Decorative Seal Background -->
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03]">
+<span class="material-symbols-outlined text-[300px] text-[#13121e]">shield</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="mt-12 flex space-x-4">
+<button class="bg-secondary/10 border border-secondary text-secondary px-8 py-3.5 rounded-lg font-label uppercase tracking-widest text-xs font-bold flex items-center space-x-3 hover:bg-secondary hover:text-on-secondary transition-all">
+<span class="material-symbols-outlined text-lg">download</span>
+<span>Download PDF</span>
+</button>
+<button class="bg-surface-container-highest/60 text-on-surface px-8 py-3.5 rounded-lg font-label uppercase tracking-widest text-xs font-bold flex items-center space-x-3 hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined text-lg">share</span>
+<span>Public Link</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+</div>
+<!-- Background Gradient Blobs -->
+<div class="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+<div class="fixed bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-secondary/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>
+</body></html>
