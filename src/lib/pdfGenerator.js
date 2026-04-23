@@ -77,105 +77,265 @@ export async function generateFilledPDF(user, template) {
     // 5. Draw the text fields
     const fields = template.config?.fields || [];
 
-    for (const field of fields) {
-      // Build a lookup from field name to user value
-      // 1. Check hardcoded system fields (name, certificate_id, date)
-      // 2. Check extra_data for any custom columns from the Excel (Course, Professor, etc.)
-      const fieldNameLower = field.name.toLowerCase().replace(/\s+/g, '_');
-      
-      let textToDraw = '';
-      if (fieldNameLower === 'name') {
-        textToDraw = user.name || '';
-      } else if (fieldNameLower === 'certificate_id') {
-        textToDraw = user.certificate_id || '';
-      } else if (fieldNameLower === 'date') {
-        textToDraw = new Date().toLocaleDateString();
-      } else if (user.extra_data && user.extra_data[field.name] !== undefined) {
-        // Look up by the exact column name stored in extra_data
-        textToDraw = String(user.extra_data[field.name] || '');
-      } else {
-        // Fallback: try case-insensitive search in extra_data
-        if (user.extra_data) {
-          const key = Object.keys(user.extra_data).find(k => k.toLowerCase() === fieldNameLower);
-          textToDraw = key ? String(user.extra_data[key] || '') : `[${field.name}]`;
-        } else {
-          textToDraw = `[${field.name}]`;
-        }
-      }
-
-      // Select the correct font and style
-      const family = field.fontFamily || 'Helvetica';
-      const fontSet = fonts[family] || fonts['Helvetica'];
-      let fontToUse = fontSet.normal;
-      
-      if (field.isBold && field.isItalic) fontToUse = fontSet.boldItalic;
-      else if (field.isBold) fontToUse = fontSet.bold;
-      else if (field.isItalic) fontToUse = fontSet.italic;
-
-      const scaledX = field.x * scaleRatio;
-      const scaledYFromTop = field.y * scaleRatio;
-      const scaledWidth = field.width * scaleRatio;
-      const scaledHeight = field.height * scaleRatio;
-      const originalScaledFontSize = field.fontSize * scaleRatio;
-      
-      // AUTO-SHRINK: If the text is wider than the bounding box, shrink the font size
-      let currentFontSize = originalScaledFontSize;
-      let textWidth = fontToUse.widthOfTextAtSize(textToDraw, currentFontSize);
-      
-      while (textWidth > scaledWidth && currentFontSize > 6) {
-        currentFontSize -= 0.5;
-        textWidth = fontToUse.widthOfTextAtSize(textToDraw, currentFontSize);
-      }
-
-      // Calculate precise X based on text alignment
-      let pdfX = scaledX; // Default to left align
-      
-      if (field.textAlign === 'center') {
-        pdfX = scaledX + (scaledWidth / 2) - (textWidth / 2);
-      } else if (field.textAlign === 'right') {
-        pdfX = scaledX + scaledWidth - textWidth;
-      }
-      
-      // Calculate precise Y based on vertical centering
-      // Box center from bottom = pdfHeight - scaledYFromTop - (scaledHeight / 2)
-      const boxCenterY = pdfHeight - scaledYFromTop - (scaledHeight / 2);
-      const pdfY = boxCenterY - (currentFontSize * 0.35);
-
-      const pdfColor = hexToRgb(field.color || '#000000');
-
-      firstPage.drawText(textToDraw, {
-        x: pdfX,
-        y: pdfY,
-        size: currentFontSize,
-        font: fontToUse,
-        color: pdfColor,
-      });
-
-      // Draw underline if requested
-      if (field.isUnderline) {
-        const underlineThickness = Math.max(1, currentFontSize * 0.08);
-        const underlineY = pdfY - (currentFontSize * 0.15); // slightly below baseline
-        
-        firstPage.drawLine({
-          start: { x: pdfX, y: underlineY },
-          end: { x: pdfX + textWidth, y: underlineY },
-          thickness: underlineThickness,
-          color: pdfColor,
+    const getActualValue = (fieldName, user) => {
+      const norm = fieldName.toLowerCase().replace(/\s+/g, '_');
+      if (norm === 'name') return user.name || '';
+      if (norm === 'certificate_id' || norm === 'certificate id')
+        return user.certificate_id || '';
+      if (norm === 'date') {
+        // Auto date: format as "April 23, 2026"
+        return new Date().toLocaleDateString('en-US', {
+          day: 'numeric', month: 'long', year: 'numeric'
         });
+      }
+      if (user.extra_data && user.extra_data[fieldName] !== undefined)
+        return String(user.extra_data[fieldName] || '');
+      if (user.extra_data) {
+        const key = Object.keys(user.extra_data).find(
+          k => k.toLowerCase() === norm || k.toLowerCase().replace(/\s+/g, '_') === norm
+        );
+        return key ? String(user.extra_data[key] || '') : `[${fieldName}]`;
+      }
+      return `[${fieldName}]`;
+    };
+
+    for (const field of fields) {
+
+      // ── Helpers ─────────────────────────────────────────────────────────────
+
+      /** Sanitize special Unicode characters that pdf-lib can't encode */
+      const sanitize = (text) => (text || '')
+        .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+        .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+        .replace(/[\u00A0\u202F\u2007\uFEFF]/g, ' ')
+        .replace(/[\u2013\u2014]/g, '-')
+        .replace(/\u2026/g, '...');
+
+      /** Resolve {{FieldName}} placeholders */
+      const resolvePlaceholders = (text) => {
+        return (text || '').replace(/{{([^{}]+)}}/g, (_, name) =>
+          sanitize(getActualValue(name.trim(), user))
+        );
+      };
+
+      /** Pick the right font from fontSet based on bold/italic flags */
+      const pickFont = (fontSet, bold, italic) => {
+        if (bold && italic) return fontSet.boldItalic;
+        if (bold) return fontSet.bold;
+        if (italic) return fontSet.italic;
+        return fontSet.normal;
+      };
+
+      /**
+       * Parse an HTML string into a flat array of segments:
+       * [{ text, isBold, isItalic, isUnderline, color, fontFamily }]
+       * Inherits base style from field-level settings.
+       */
+      const parseHTMLToSegments = (html, base) => {
+        const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+        const segments = [];
+
+        const walk = (node, style) => {
+          if (node.nodeType === 3) {
+            // Text node
+            const text = resolvePlaceholders(sanitize(node.textContent));
+            if (text) segments.push({ text, ...style });
+            return;
+          }
+          if (node.nodeType !== 1) return;
+
+          const tag = node.tagName.toLowerCase();
+          const s = { ...style };
+
+          if (tag === 'b' || tag === 'strong') s.isBold = true;
+          if (tag === 'i' || tag === 'em') s.isItalic = true;
+          if (tag === 'u') s.isUnderline = true;
+
+          // Inline style overrides
+          if (node.style) {
+            if (node.style.fontWeight === 'bold') s.isBold = true;
+            if (node.style.fontStyle === 'italic') s.isItalic = true;
+            if (node.style.textDecoration?.includes('underline')) s.isUnderline = true;
+            if (node.style.color) s.color = node.style.color;
+          }
+          if (tag === 'font' && node.getAttribute('color')) s.color = node.getAttribute('color');
+
+          if (tag === 'br') {
+            segments.push({ text: '\n', ...s });
+            return;
+          }
+
+          node.childNodes.forEach(child => walk(child, s));
+
+          // Block elements add a newline after
+          if (['div', 'p', 'li', 'h1', 'h2', 'h3', 'h4'].includes(tag)) {
+            segments.push({ text: '\n', ...s });
+          }
+        };
+
+        walk(doc.body, base);
+
+        // Trim leading/trailing newline segments
+        while (segments.length && segments[0].text === '\n') segments.shift();
+        while (segments.length && segments[segments.length - 1].text === '\n') segments.pop();
+
+        return segments;
+      };
+
+      /**
+       * Word-wrap segments into lines.
+       * Each line = array of {text, font, color, isUnderline}
+       */
+      const wrapSegments = (segments, maxWidth, fontSet, baseFontSize) => {
+        // Tokenise: split segments on spaces/newlines into individual tokens
+        const tokens = [];
+        for (const seg of segments) {
+          const font = pickFont(fontSet, seg.isBold, seg.isItalic);
+          const parts = seg.text.split(/(\n| )/);
+          for (const part of parts) {
+            if (part === '') continue;
+            tokens.push({ text: part, font, color: seg.color, isUnderline: seg.isUnderline, isNewline: part === '\n' });
+          }
+        }
+
+        const lines = [[]]; // Array of lines; each line = array of tokens
+        let lineWidth = 0;
+
+        for (const token of tokens) {
+          if (token.isNewline) {
+            lines.push([]);
+            lineWidth = 0;
+            continue;
+          }
+          const w = token.font.widthOfTextAtSize(token.text, baseFontSize);
+          if (token.text === ' ') {
+            // Only add space if line not empty
+            if (lines[lines.length - 1].length > 0) {
+              lines[lines.length - 1].push({ ...token, width: w });
+              lineWidth += w;
+            }
+          } else if (lineWidth + w > maxWidth && lines[lines.length - 1].length > 0) {
+            // Wrap: start new line
+            lines.push([{ ...token, width: w }]);
+            lineWidth = w;
+          } else {
+            lines[lines.length - 1].push({ ...token, width: w });
+            lineWidth += w;
+          }
+        }
+
+        // Remove trailing empty lines
+        while (lines.length > 1 && lines[lines.length - 1].length === 0) lines.pop();
+
+        return lines;
+      };
+
+      // ── Field rendering ───────────────────────────────────────────────────
+
+      const scaledX      = (field.x      || 0)   * scaleRatio;
+      const scaledYTop   = (field.y      || 0)   * scaleRatio;
+      const scaledWidth  = Math.max(50, (field.width  || 200) * scaleRatio);
+      const scaledHeight = Math.max(20, (field.height ||  50) * scaleRatio);
+
+      const fontFamily = field.fontFamily || 'Helvetica';
+      const fontSet    = fonts[fontFamily] || fonts['Helvetica'];
+      const baseColor  = hexToRgb(field.color || '#000000');
+
+      // Build base style from field-level settings
+      const baseStyle = {
+        isBold:      field.isBold      || false,
+        isItalic:    field.isItalic    || false,
+        isUnderline: field.isUnderline || false,
+        color:       field.color       || '#000000',
+      };
+
+      // Get HTML content
+      let rawHTML = '';
+      if (field.type === 'textBlock' || field.name === 'Custom Text') {
+        rawHTML = field.text || '';
+      } else {
+        // Dynamic name fields: just resolve the placeholder
+        rawHTML = resolvePlaceholders(`{{${field.name}}}`);
+      }
+
+      if (!rawHTML.trim()) continue;
+
+      // Parse segments (handles both plain text and HTML)
+      const segments = rawHTML.includes('<')
+        ? parseHTMLToSegments(rawHTML, baseStyle)
+        : [{ text: resolvePlaceholders(sanitize(rawHTML)), ...baseStyle }];
+
+      if (segments.length === 0 || segments.every(s => !s.text.trim())) continue;
+
+      // Auto-shrink: find the largest fontSize that fits the box
+      let fontSize = (field.fontSize || 12) * scaleRatio;
+      let wrappedLines;
+      const lineHeightMult = field.lineHeight || 1.4;
+
+      while (fontSize > 4) {
+        wrappedLines = wrapSegments(segments, scaledWidth, fontSet, fontSize);
+        const totalH = wrappedLines.length * lineHeightMult * fontSize;
+        if (totalH <= scaledHeight) break;
+        fontSize -= 0.5;
+      }
+      if (!wrappedLines) wrappedLines = wrapSegments(segments, scaledWidth, fontSet, fontSize);
+
+      const lineHeight  = lineHeightMult * fontSize;
+      const totalTextH  = wrappedLines.length * lineHeight;
+      const boxTop      = pdfHeight - scaledYTop;
+      const boxBottom   = boxTop - scaledHeight;
+
+      // Vertically centre text inside the box
+      let currentY = boxTop - (scaledHeight - totalTextH) / 2 - fontSize;
+
+      for (const line of wrappedLines) {
+        if (currentY < boxBottom - fontSize) break;
+
+        // Measure full line width for alignment
+        const lineW = line.reduce((sum, t) => sum + t.width, 0);
+        let x = scaledX;
+        if (field.textAlign === 'center') x = scaledX + (scaledWidth - lineW) / 2;
+        else if (field.textAlign === 'right') x = scaledX + scaledWidth - lineW;
+
+        // Draw each token in the line
+        for (const token of line) {
+          if (!token.text.trim() && token.text !== ' ') { x += token.width; continue; }
+
+          const segColor = token.color ? (() => {
+            try { return hexToRgb(token.color); } catch { return baseColor; }
+          })() : baseColor;
+
+          firstPage.drawText(token.text, {
+            x, y: currentY,
+            size: fontSize,
+            font: token.font,
+            color: segColor,
+          });
+
+          if (token.isUnderline) {
+            firstPage.drawLine({
+              start: { x, y: currentY - fontSize * 0.12 },
+              end:   { x: x + token.width, y: currentY - fontSize * 0.12 },
+              thickness: Math.max(0.5, fontSize * 0.05),
+              color: segColor,
+            });
+          }
+
+          x += token.width;
+        }
+
+        currentY -= lineHeight;
       }
     }
 
-    // 6. Serialize the PDFDocument to bytes (a Uint8Array)
+    // 6. Serialize to bytes and return as blob URL
     const pdfBytes = await pdfDoc.save();
-
-    // 7. Create a Blob and return the URL
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const blobUrl = URL.createObjectURL(blob);
-    
-    return blobUrl;
+    return URL.createObjectURL(blob);
 
   } catch (error) {
     console.error('Error generating PDF:', error);
     throw error;
   }
 }
+
