@@ -665,6 +665,7 @@ function TemplateBuilder({ preSelectedGroupId, onGroupConsumed }) {
                       fontFamily: field.fontFamily,
                       color: field.color,
                       textAlign: field.textAlign,
+                      textAlignLast: field.textAlign === 'justify' ? 'justify' : 'auto',
                       fontWeight: field.isBold ? 'bold' : 'normal',
                       fontStyle: field.isItalic ? 'italic' : 'normal',
                       textDecoration: field.isUnderline ? 'underline' : 'none',
@@ -699,7 +700,7 @@ function TemplateBuilder({ preSelectedGroupId, onGroupConsumed }) {
                               e.preventDefault(); handleRedo(field.id);
                             }
                           }}
-                          style={{ textAlign: field.textAlign, lineHeight: field.lineHeight || 1.4 }}
+                          style={{ textAlign: field.textAlign, textAlignLast: field.textAlign === 'justify' ? 'justify' : 'auto', lineHeight: field.lineHeight || 1.4 }}
                         />
                       ) : (
                         <div
