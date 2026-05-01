@@ -301,7 +301,7 @@ export async function generateFilledPDF(user, template) {
           x = scaledX + (scaledWidth - lineW) / 2;
         } else if (field.textAlign === 'right') {
           x = scaledX + scaledWidth - lineW;
-        } else if (field.textAlign === 'justify') {
+        } else if (field.textAlign === 'justify' && i < wrappedLines.length - 1) {
           // Count spaces in the line
           const spaceCount = line.filter(t => t.text === ' ').length;
           if (spaceCount > 0) {
