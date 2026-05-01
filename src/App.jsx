@@ -34,9 +34,12 @@ function AppLayout({ session }) {
     <>
       {/* Global Navbar */}
       <header className="w-full h-14 sm:h-16 sticky top-0 z-50 bg-[#13121e]/60 backdrop-blur-md flex justify-between items-center px-4 sm:px-8 border-b border-white/5">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[#e9c349] text-xl sm:text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
-          <span className="text-lg sm:text-2xl font-headline tracking-tighter text-[#e9c349]">Certificate Maker</span>
+        <Link to="/" className="flex items-center gap-3">
+          <img src="/jyothi-logo.png" alt="Jyothi Engineering College Logo" className="h-8 sm:h-10 w-auto object-contain" />
+          <div className="flex flex-col">
+            <span className="text-lg sm:text-2xl font-headline tracking-tighter text-[#e9c349] leading-none">Certificate Maker</span>
+            <span className="text-[10px] text-on-surface-variant font-medium mt-1 uppercase tracking-wider">By Jyothi Engineering College</span>
+          </div>
         </Link>
         <nav className="flex items-center gap-4">
           {session ? (
