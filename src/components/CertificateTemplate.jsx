@@ -94,7 +94,7 @@ const CertificateTemplate = forwardRef(({ certData }, ref) => {
               textAlign: field.textAlign,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: field.textAlign === 'center' ? 'center' : field.textAlign === 'right' ? 'flex-end' : 'flex-start',
+              justifyContent: field.textAlign === 'center' ? 'center' : field.textAlign === 'right' ? 'flex-end' : field.textAlign === 'justify' ? 'space-between' : 'flex-start',
               lineHeight: 1,
               whiteSpace: 'nowrap'
             }}

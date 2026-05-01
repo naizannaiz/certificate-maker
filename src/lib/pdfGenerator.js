@@ -288,14 +288,26 @@ export async function generateFilledPDF(user, template) {
       // Vertically centre text inside the box
       let currentY = boxTop - (scaledHeight - totalTextH) / 2 - fontSize;
 
-      for (const line of wrappedLines) {
+      for (let i = 0; i < wrappedLines.length; i++) {
+        const line = wrappedLines[i];
         if (currentY < boxBottom - fontSize) break;
 
         // Measure full line width for alignment
         const lineW = line.reduce((sum, t) => sum + t.width, 0);
         let x = scaledX;
-        if (field.textAlign === 'center') x = scaledX + (scaledWidth - lineW) / 2;
-        else if (field.textAlign === 'right') x = scaledX + scaledWidth - lineW;
+        let wordSpacing = 0;
+
+        if (field.textAlign === 'center') {
+          x = scaledX + (scaledWidth - lineW) / 2;
+        } else if (field.textAlign === 'right') {
+          x = scaledX + scaledWidth - lineW;
+        } else if (field.textAlign === 'justify' && i < wrappedLines.length - 1) {
+          // Count spaces in the line
+          const spaceCount = line.filter(t => t.text === ' ').length;
+          if (spaceCount > 0) {
+            wordSpacing = (scaledWidth - lineW) / spaceCount;
+          }
+        }
 
         // Draw each token in the line
         for (const token of line) {
@@ -322,6 +334,9 @@ export async function generateFilledPDF(user, template) {
           }
 
           x += token.width;
+          if (token.text === ' ' && wordSpacing > 0) {
+            x += wordSpacing;
+          }
         }
 
         currentY -= lineHeight;

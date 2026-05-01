@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Rnd } from 'react-rnd';
 import { supabase } from '../lib/supabase';
-import { ImagePlus, Save, Plus, UploadCloud, Layers, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, GripVertical, Move, RotateCcw, Trash2, Undo2, Redo2 } from 'lucide-react';
+import { ImagePlus, Save, Plus, UploadCloud, Layers, AlignLeft, AlignCenter, AlignRight, AlignJustify, Bold, Italic, Underline, GripVertical, Move, RotateCcw, Trash2, Undo2, Redo2 } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -836,6 +836,13 @@ function TemplateBuilder({ preSelectedGroupId, onGroupConsumed }) {
                           title="Align Right"
                         >
                           <AlignRight size={14} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); updateField(field.id, { textAlign: 'justify' }); }}
+                          className={`p-1 rounded ${field.textAlign === 'justify' ? 'bg-primary/20 text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+                          title="Justify"
+                        >
+                          <AlignJustify size={14} />
                         </button>
                       </div>
                       <div className="w-px h-4 bg-white/10 mx-1"></div>
