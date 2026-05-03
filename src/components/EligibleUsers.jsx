@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { RefreshCcw, ChevronDown, ChevronRight, Users, CheckCircle2, XCircle, Search, Upload, AlertCircle, Loader2 } from 'lucide-react';
+import { RefreshCcw, ChevronDown, ChevronRight, Users, CheckCircle2, XCircle, Search, Upload, AlertCircle, Loader2, UserMinus, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const NAME_KEYS  = ['name'];
@@ -23,6 +23,18 @@ function EligibleUsers() {
   
   const [uploadingGroupId, setUploadingGroupId] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Duplicates State
+  const [duplicateUsers, setDuplicateUsers] = useState([]);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateGroupId, setDuplicateGroupId] = useState(null);
+  const [isRemovingDuplicates, setIsRemovingDuplicates] = useState(false);
+
+  // Field Mapping State for Appending
+  const [mappingModalOpen, setMappingModalOpen] = useState(false);
+  const [mappingFileData, setMappingFileData] = useState(null);
+  const [fieldMapping, setFieldMapping] = useState({});
+  const [isImporting, setIsImporting] = useState(false);
 
   const fetchAll = async () => {
     setIsLoading(true);
@@ -119,53 +131,175 @@ function EligibleUsers() {
             const headers = jsonData[0].map(h => h ? h.toString().trim() : 'Unknown');
             const allRows = XLSX.utils.sheet_to_json(worksheet, { header: headers, range: 1 });
 
+            const targetGroup = groups.find(g => g.id === uploadingGroupId);
+            if (!targetGroup) return;
+
             const nameCol = autoDetect(headers, NAME_KEYS);
             const emailCol = autoDetect(headers, EMAIL_KEYS);
             const phoneCol = autoDetect(headers, PHONE_KEYS);
             
-            // For extra columns, let's figure out what this group already has
-            const targetGroup = groups.find(g => g.id === uploadingGroupId);
-            // We can just add all other columns as extra_data
-            const extraColumns = headers.filter(col => col !== nameCol && col !== emailCol && col !== phoneCol);
+            // Expected template columns from the target group
+            const originalExtraCols = targetGroup.columns || [];
+            
+            // Try to auto-match new headers to old extra columns
+            const initialMapping = {
+              __name__: nameCol,
+              __email__: emailCol,
+              __phone__: phoneCol,
+            };
+            
+            // Try to auto-match each group column to new Excel headers.
+            // Priority: exact name match → fuzzy system-field match → blank (needs manual)
+            const isNameLike  = (c) => NAME_KEYS.some(k  => formatKey(c).includes(k));
+            const isEmailLike = (c) => EMAIL_KEYS.some(k => formatKey(c).includes(k));
+            const isPhoneLike = (c) => PHONE_KEYS.some(k => formatKey(c).includes(k));
 
-            const usersToInsert = allRows.map(row => {
-              const extra = {};
-              extraColumns.forEach(col => {
-                extra[col] = safeStr(row[col]);
-              });
-
-              return {
-                name: safeStr(row[nameCol]) || 'Unknown',
-                email: safeStr(row[emailCol]),
-                phone: safeStr(row[phoneCol]),
-                certificate_id: `CERT-${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
-                is_eligible: true,
-                group_id: uploadingGroupId,
-                extra_data: extra,
-              };
+            originalExtraCols.forEach(col => {
+              if (headers.includes(col)) {
+                // Exact column name match in new file → use it
+                initialMapping[col] = col;
+              } else if (isNameLike(col) && nameCol) {
+                // Group column is a "name" type → point it at detected name column
+                initialMapping[col] = nameCol;
+              } else if (isEmailLike(col) && emailCol) {
+                initialMapping[col] = emailCol;
+              } else if (isPhoneLike(col) && phoneCol) {
+                initialMapping[col] = phoneCol;
+              } else {
+                // Fuzzy: find any new header that partially matches old column name
+                const fuzzy = headers.find(h =>
+                  formatKey(h).includes(formatKey(col)) || formatKey(col).includes(formatKey(h))
+                );
+                initialMapping[col] = fuzzy || '';
+              }
             });
 
-            const { error: insertError } = await supabase.from('users').insert(usersToInsert);
-            if (insertError) throw insertError;
-
-            // Refresh data
-            await fetchAll();
-            setExpandedGroups(prev => ({ ...prev, [uploadingGroupId]: true }));
+            setMappingFileData({ headers, allRows, targetGroup, originalExtraCols });
+            setFieldMapping(initialMapping);
+            setMappingModalOpen(true);
+            
           }
         } catch (err) {
           console.error('Error processing Excel:', err);
           setError('Failed to process Excel file.');
-        } finally {
-          setUploadingGroupId(null);
-          if (fileInputRef.current) fileInputRef.current.value = '';
+          closeMappingModal();
         }
       };
       reader.readAsBinaryString(file);
     } catch (err) {
       console.error('File upload error:', err);
       setError('Failed to upload file.');
-      setUploadingGroupId(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      closeMappingModal();
+    }
+  };
+
+  const closeMappingModal = () => {
+    setMappingModalOpen(false);
+    setMappingFileData(null);
+    setUploadingGroupId(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    if (!mappingFileData) return;
+    setIsImporting(true);
+    
+    const { allRows, targetGroup, originalExtraCols } = mappingFileData;
+    
+    try {
+      const usersToInsert = allRows.map(row => {
+        const extra = {};
+        originalExtraCols.forEach(col => {
+          const mappedHeader = fieldMapping[col];
+          extra[col] = mappedHeader ? safeStr(row[mappedHeader]) : '';
+        });
+
+        return {
+          name: safeStr(row[fieldMapping.__name__]) || 'Unknown',
+          email: safeStr(row[fieldMapping.__email__]),
+          phone: safeStr(row[fieldMapping.__phone__]),
+          certificate_id: `CERT-${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+          is_eligible: true,
+          group_id: targetGroup.id,
+          extra_data: extra,
+        };
+      });
+
+      const { error: insertError } = await supabase.from('users').insert(usersToInsert);
+      if (insertError) throw insertError;
+
+      await fetchAll();
+      setExpandedGroups(prev => ({ ...prev, [targetGroup.id]: true }));
+      closeMappingModal();
+    } catch (err) {
+      console.error('Import error:', err);
+      alert('Failed to import users.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleFindDuplicates = (groupId) => {
+    const group = groups.find(g => g.id === groupId);
+    if (!group || !group.users) return;
+
+    const seenEmails = new Set();
+    const seenPhones = new Set();
+    const duplicates = [];
+    
+    group.users.forEach(user => {
+      let isDuplicate = false;
+      const email = user.email?.toLowerCase().trim();
+      const phone = user.phone?.replace(/[^0-9+]/g, ''); 
+
+      if (email && seenEmails.has(email)) {
+        isDuplicate = true;
+      }
+      if (phone && seenPhones.has(phone)) {
+        isDuplicate = true;
+      }
+
+      if (isDuplicate) {
+        duplicates.push(user);
+      } else {
+        if (email) seenEmails.add(email);
+        if (phone) seenPhones.add(phone);
+      }
+    });
+
+    if (duplicates.length === 0) {
+      alert("No duplicates found in this group.");
+      return;
+    }
+
+    setDuplicateUsers(duplicates);
+    setDuplicateGroupId(groupId);
+    setShowDuplicateModal(true);
+  };
+
+  const handleRemoveDuplicates = async () => {
+    if (duplicateUsers.length === 0) return;
+    setIsRemovingDuplicates(true);
+    try {
+      const idsToRemove = duplicateUsers.map(u => u.id);
+      
+      const { error: delError } = await supabase
+        .from('users')
+        .delete()
+        .in('id', idsToRemove);
+
+      if (delError) throw delError;
+      
+      setShowDuplicateModal(false);
+      setDuplicateUsers([]);
+      setDuplicateGroupId(null);
+      await fetchAll();
+      
+    } catch (err) {
+      console.error('Error removing duplicates:', err);
+      alert('Failed to remove duplicates.');
+    } finally {
+      setIsRemovingDuplicates(false);
     }
   };
 
@@ -259,23 +393,36 @@ function EligibleUsers() {
                       </span>
                     )}
                     {group.id !== '__orphan__' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setUploadingGroupId(group.id);
-                          fileInputRef.current?.click();
-                        }}
-                        disabled={uploadingGroupId === group.id}
-                        className="ml-2 flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-                        title="Upload Excel to add users"
-                      >
-                        {uploadingGroupId === group.id ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <Upload size={14} />
-                        )}
-                        <span className="hidden sm:inline">Add Users</span>
-                      </button>
+                      <div className="flex items-center gap-2 ml-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFindDuplicates(group.id);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                          title="Find and remove duplicates"
+                        >
+                          <UserMinus size={14} />
+                          <span className="hidden sm:inline">Duplicates</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUploadingGroupId(group.id);
+                            fileInputRef.current?.click();
+                          }}
+                          disabled={uploadingGroupId === group.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                          title="Upload Excel to add users"
+                        >
+                          {uploadingGroupId === group.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Upload size={14} />
+                          )}
+                          <span className="hidden sm:inline">Add Users</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -337,6 +484,188 @@ function EligibleUsers() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Duplicate Verification Modal */}
+      {showDuplicateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-surface-container rounded-2xl max-w-2xl w-full max-h-[80vh] flex flex-col border border-white/10 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-headline text-red-400 flex items-center gap-2">
+                  <AlertCircle size={20} />
+                  Review Duplicates
+                </h3>
+                <p className="text-sm text-on-surface-variant mt-1">
+                  Found {duplicateUsers.length} duplicated user(s) based on matching Email or Phone.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowDuplicateModal(false)}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors text-on-surface-variant"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6 bg-surface-container-low/50">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-white/5 text-xs uppercase text-on-surface-variant">
+                  <tr>
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">Phone</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {duplicateUsers.map(u => (
+                    <tr key={u.id}>
+                      <td className="px-4 py-3 font-medium text-on-surface">{u.name}</td>
+                      <td className="px-4 py-3 text-red-300">{u.email || '—'}</td>
+                      <td className="px-4 py-3 text-red-300">{u.phone || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-6 border-t border-white/5 flex justify-end gap-3 bg-surface-container">
+              <button
+                onClick={() => setShowDuplicateModal(false)}
+                className="px-5 py-2.5 rounded-xl font-medium text-sm text-on-surface hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRemoveDuplicates}
+                disabled={isRemovingDuplicates}
+                className="px-5 py-2.5 rounded-xl font-medium text-sm bg-red-500 hover:bg-red-600 text-white transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {isRemovingDuplicates ? <Loader2 size={16} className="animate-spin" /> : <UserMinus size={16} />}
+                Remove {duplicateUsers.length} Duplicate{duplicateUsers.length !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Field Mapping Verification Modal */}
+      {mappingModalOpen && mappingFileData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-surface-container rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-white/10 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-headline text-on-surface flex items-center gap-2">
+                  <FileSpreadsheet size={20} className="text-primary" />
+                  Verify Field Mapping
+                </h3>
+                <p className="text-sm text-on-surface-variant mt-1">
+                  Match the columns from your new Excel file to the fields expected by this group.
+                </p>
+              </div>
+              <button 
+                onClick={closeMappingModal}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors text-on-surface-variant"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6 bg-surface-container-low/50 space-y-4">
+              {/* Render System Fields */}
+              {[
+                { key: '__name__', label: 'Name', icon: '👤' },
+                { key: '__email__', label: 'Email', icon: '✉️' },
+                { key: '__phone__', label: 'Phone', icon: '📱' }
+              ].map(field => (
+                <div key={field.key} className="flex items-center gap-4 p-4 rounded-xl border bg-white/5 border-white/5">
+                  <div className="text-2xl flex-shrink-0">{field.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-on-surface">{field.label} Column</p>
+                  </div>
+                  <select
+                    value={fieldMapping[field.key] || ''}
+                    onChange={e => setFieldMapping(prev => ({ ...prev, [field.key]: e.target.value }))}
+                    className="flex-shrink-0 w-48 bg-surface-container border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                  >
+                    <option value="">— Not mapped —</option>
+                    {mappingFileData.headers.map(col => <option key={col} value={col}>{col}</option>)}
+                  </select>
+                </div>
+              ))}
+
+              {/* Render Template Columns */}
+              {mappingFileData.originalExtraCols.length > 0 && (
+                <div className="pt-4 border-t border-white/5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-headline text-secondary">Template Columns (used in certificate)</h4>
+                    <span className="text-xs text-on-surface-variant">Map each → your new Excel column</span>
+                  </div>
+                  <div className="space-y-3">
+                    {mappingFileData.originalExtraCols.map(colName => {
+                      const isMapped = !!fieldMapping[colName];
+                      const isAutoSystemField =
+                        NAME_KEYS.some(k => formatKey(colName).includes(k)) ||
+                        EMAIL_KEYS.some(k => formatKey(colName).includes(k)) ||
+                        PHONE_KEYS.some(k => formatKey(colName).includes(k));
+                      return (
+                        <div key={colName} className={`flex items-center gap-4 p-4 rounded-xl border ${!isMapped ? 'bg-yellow-500/5 border-yellow-500/30' : 'bg-white/5 border-white/5'}`}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-on-surface">{colName}</p>
+                              {isAutoSystemField && isMapped && (
+                                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">auto-mapped</span>
+                              )}
+                            </div>
+                            {!isMapped && <p className="text-xs text-yellow-400 mt-1">⚠ Needs mapping — certificate will show placeholder</p>}
+                          </div>
+                          <select
+                            value={fieldMapping[colName] || ''}
+                            onChange={e => setFieldMapping(prev => ({ ...prev, [colName]: e.target.value }))}
+                            className="flex-shrink-0 w-48 bg-surface-container border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                          >
+                            <option value="">— Not mapped —</option>
+                            {mappingFileData.headers.map(col => <option key={col} value={col}>{col}</option>)}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Row */}
+              {mappingFileData.allRows.length > 0 && (
+                <div className="mt-4 p-4 bg-green-500/5 border border-green-500/20 rounded-xl text-xs space-y-1">
+                  <p className="font-medium text-green-400 mb-2">✓ Preview (First Row)</p>
+                  <p><span className="text-on-surface-variant">Name:</span> <span className="text-on-surface">{safeStr(mappingFileData.allRows[0][fieldMapping.__name__]) || '—'}</span></p>
+                  <p><span className="text-on-surface-variant">Email:</span> <span className="text-on-surface">{safeStr(mappingFileData.allRows[0][fieldMapping.__email__]) || '—'}</span></p>
+                  <p><span className="text-on-surface-variant">Phone:</span> <span className="text-on-surface">{safeStr(mappingFileData.allRows[0][fieldMapping.__phone__]) || '—'}</span></p>
+                  {mappingFileData.originalExtraCols.map(col => (
+                    <p key={col}><span className="text-on-surface-variant">{col}:</span> <span className="text-on-surface">{safeStr(mappingFileData.allRows[0][fieldMapping[col]]) || '—'}</span></p>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-white/5 flex justify-end gap-3 bg-surface-container">
+              <button
+                onClick={closeMappingModal}
+                className="px-5 py-2.5 rounded-xl font-medium text-sm text-on-surface hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmImport}
+                disabled={isImporting}
+                className="px-5 py-2.5 rounded-xl font-medium text-sm bg-primary hover:bg-primary/90 text-on-primary transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {isImporting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                Confirm & Import {mappingFileData.allRows.length} Users
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
