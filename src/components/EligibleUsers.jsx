@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { RefreshCcw, ChevronDown, ChevronRight, Users, CheckCircle2, XCircle, Search, Upload, AlertCircle, Loader2, UserMinus, FileSpreadsheet } from 'lucide-react';
+import { RefreshCcw, ChevronDown, ChevronRight, Users, CheckCircle2, XCircle, Search, Upload, AlertCircle, Loader2, UserMinus, FileSpreadsheet, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const NAME_KEYS  = ['name'];
@@ -303,6 +303,20 @@ function EligibleUsers() {
     }
   };
 
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Are you sure you want to delete user "${userName}"?`)) return;
+    
+    try {
+      const { error: delError } = await supabase.from('users').delete().eq('id', userId);
+      if (delError) throw delError;
+      
+      await fetchAll();
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      alert('Failed to delete user.');
+    }
+  };
+
   return (
     <div className="space-y-4 max-w-5xl">
       {/* Header */}
@@ -448,6 +462,7 @@ function EligibleUsers() {
                               ))
                             }
                             <th className="px-4 py-3 text-center">Eligible</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
@@ -473,6 +488,15 @@ function EligibleUsers() {
                                   ? <CheckCircle2 size={16} className="text-green-400 mx-auto" />
                                   : <XCircle size={16} className="text-red-400 mx-auto" />
                                 }
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  onClick={() => handleDeleteUser(user.id, user.name)}
+                                  className="p-1.5 text-on-surface-variant hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                  title="Delete user"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
                               </td>
                             </tr>
                           ))}

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Upload, LayoutTemplate, Users, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { Upload, LayoutTemplate, Users, Settings, Home, LogOut } from 'lucide-react';
 import ExcelAnalyzer from '../components/ExcelAnalyzer';
 import TemplateBuilder from '../components/TemplateBuilder';
 import FlushData from '../components/FlushData';
@@ -10,9 +12,16 @@ function AdminDashboard() {
   // When an Excel group is created, we pass its ID to the TemplateBuilder for auto-selection
   const [preSelectedGroupId, setPreSelectedGroupId] = useState(null);
 
+  const navigate = useNavigate();
+
   const handleGroupCreated = (groupId) => {
     setPreSelectedGroupId(groupId);
     setActiveTab('templates'); // Switch to Template Engine automatically
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/admin/login');
   };
 
   return (
@@ -47,13 +56,29 @@ function AdminDashboard() {
           </button>
         </nav>
         
-        <div className="mt-auto pt-4 border-t border-white/5">
+        <div className="mt-auto pt-4 border-t border-white/5 space-y-2">
           <button
             onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'settings' ? 'bg-red-500/20 text-red-400' : 'text-on-surface-variant hover:bg-white/5'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'settings' ? 'bg-primary/20 text-primary' : 'text-on-surface-variant hover:bg-white/5'}`}
           >
             <Settings size={20} />
             <span>Settings</span>
+          </button>
+          
+          <button
+            onClick={() => navigate('/')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-on-surface-variant hover:bg-white/5"
+          >
+            <Home size={20} />
+            <span>Go to Home</span>
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-red-400 hover:bg-red-500/10"
+          >
+            <LogOut size={20} />
+            <span>Sign Out</span>
           </button>
         </div>
       </aside>
