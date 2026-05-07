@@ -105,6 +105,7 @@ export async function generateFilledPDF(user, template) {
 
       /** Sanitize special Unicode characters that pdf-lib can't encode */
       const sanitize = (text) => (text || '')
+        .replace(/\r/g, '')                          // Strip Windows carriage returns (0x000d) — WinAnsi cannot encode them
         .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
         .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
         .replace(/[\u00A0\u202F\u2007\uFEFF]/g, ' ')
