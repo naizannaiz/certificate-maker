@@ -79,42 +79,53 @@ export async function generateFilledPDF(user, template) {
 
     const getActualValue = (fieldName, user) => {
       const norm = fieldName.toLowerCase().replace(/\s+/g, '_');
+      const stripAlpha = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
 
-      // ── Certificate ID ──────────────────────────────────────────────────────
-      if (norm === 'certificate_id' || norm === 'certificate_id')
+      // ── Fixed system fields ─────────────────────────────────────────────────
+      if (norm === 'certificate_id' || norm === 'certificate id')
         return user.certificate_id || '';
-
-      // ── Date ────────────────────────────────────────────────────────────────
       if (norm === 'date') {
-        return new Date().toLocaleDateString('en-US', {
-          day: 'numeric', month: 'long', year: 'numeric'
-        });
+        return new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
       }
 
-      // ── Exact extra_data key match ───────────────────────────────────────────
+      // ── Exact extra_data key match ──────────────────────────────────────────
       if (user.extra_data && user.extra_data[fieldName] !== undefined)
         return String(user.extra_data[fieldName] || '');
 
-      // ── Fuzzy extra_data key match ───────────────────────────────────────────
       if (user.extra_data && Object.keys(user.extra_data).length > 0) {
-        const key = Object.keys(user.extra_data).find(
-          k => k.toLowerCase() === norm ||
-               k.toLowerCase().replace(/\s+/g, '_') === norm ||
-               norm.includes(k.toLowerCase().replace(/\s+/g, '_')) ||
-               k.toLowerCase().replace(/\s+/g, '_').includes(norm)
-        );
-        if (key) return String(user.extra_data[key] || '');
+        const edKeys = Object.keys(user.extra_data);
+
+        // 1. Case-insensitive exact
+        const exact = edKeys.find(k => k.toLowerCase() === fieldName.toLowerCase());
+        if (exact) return String(user.extra_data[exact] || '');
+
+        // 2. Normalised underscores
+        const normMatch = edKeys.find(k => k.toLowerCase().replace(/\s+/g, '_') === norm);
+        if (normMatch) return String(user.extra_data[normMatch] || '');
+
+        // 3. Strip all non-alpha
+        const strippedMatch = edKeys.find(k => stripAlpha(k) === stripAlpha(fieldName));
+        if (strippedMatch) return String(user.extra_data[strippedMatch] || '');
+
+        // 4. Word-level overlap — "Full Name" → key "Name", "Institution / Organization Name" → key "Institution"
+        const stopWords = new Set(['and','or','the','of','a','an','by','in','for','to']);
+        const fieldWords = fieldName.toLowerCase().split(/[\s/,_\-&()]+/).filter(w => w.length > 2 && !stopWords.has(w));
+        let bestKey = null, bestScore = 0;
+        for (const k of edKeys) {
+          const kWords = k.toLowerCase().split(/[\s/,_\-&()]+/).filter(w => w.length > 2 && !stopWords.has(w));
+          const score = fieldWords.filter(fw => kWords.some(kw => kw.includes(fw) || fw.includes(kw))).length;
+          if (score > bestScore) { bestScore = score; bestKey = k; }
+        }
+        if (bestKey && bestScore > 0) return String(user.extra_data[bestKey] || '');
       }
 
-      // ── Fallback: if the field is name-related, use user.name ───────────────
-      if (norm === 'name' || norm === 'full_name' || norm === 'fullname' ||
-          norm === 'participant_name' || norm.endsWith('_name') && !norm.includes('institution') && !norm.includes('organization')) {
-        if (user.name) return user.name;
-      }
+      // ── Fallback: name-related fields → user.name ───────────────────────────
+      if (stripAlpha(fieldName).includes('name') && user.name) return user.name;
 
-      // ── Last resort fallback ─────────────────────────────────────────────────
+      // ── Last resort ────────────────────────────────────────────────────────
       return `[${fieldName}]`;
     };
+
 
     for (const field of fields) {
 
