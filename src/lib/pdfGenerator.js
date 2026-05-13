@@ -107,16 +107,32 @@ export async function generateFilledPDF(user, template) {
         const strippedMatch = edKeys.find(k => stripAlpha(k) === stripAlpha(fieldName));
         if (strippedMatch) return String(user.extra_data[strippedMatch] || '');
 
-        // 4. Word-level overlap — "Full Name" → key "Name", "Institution / Organization Name" → key "Institution"
+        // 4. Jaccard word-similarity — avoids "Full Name" matching "Institution / Organization Name"
+        //    because both contain "name". Jaccard = |intersection| / |union|, so shorter precise
+        //    keys (like "Name") beat longer ambiguous ones (like "Institution / Organization Name").
         const stopWords = new Set(['and','or','the','of','a','an','by','in','for','to']);
-        const fieldWords = fieldName.toLowerCase().split(/[\s/,_\-&()]+/).filter(w => w.length > 2 && !stopWords.has(w));
-        let bestKey = null, bestScore = 0;
-        for (const k of edKeys) {
-          const kWords = k.toLowerCase().split(/[\s/,_\-&()]+/).filter(w => w.length > 2 && !stopWords.has(w));
-          const score = fieldWords.filter(fw => kWords.some(kw => kw.includes(fw) || fw.includes(kw))).length;
-          if (score > bestScore) { bestScore = score; bestKey = k; }
+        const toWords = (s) => s.toLowerCase().split(/[\s/,_\-&()]+/).filter(w => w.length > 2 && !stopWords.has(w));
+        const fieldWords = toWords(fieldName);
+
+        if (fieldWords.length > 0) {
+          const firstFieldWord = fieldWords[0]; // tiebreaker: prefer key whose first word matches field's first word
+          let bestKey = null, bestScore = -1;
+
+          for (const k of edKeys) {
+            const kWords = toWords(k);
+            if (kWords.length === 0) continue;
+            const matched = fieldWords.filter(fw => kWords.some(kw => kw.includes(fw) || fw.includes(kw))).length;
+            if (matched === 0) continue;
+            const union = fieldWords.length + kWords.length - matched;
+            const jaccard = matched / union;
+            // Tiebreaker: small boost when the key's first word matches the field's first word
+            const firstWordBonus = kWords.some(kw => kw.includes(firstFieldWord) || firstFieldWord.includes(kw)) ? 0.01 : 0;
+            const score = jaccard + firstWordBonus;
+            if (score > bestScore) { bestScore = score; bestKey = k; }
+          }
+          // Only use if reasonably confident (jaccard ≥ ~0.2 before bonus)
+          if (bestKey && bestScore >= 0.19) return String(user.extra_data[bestKey] || '');
         }
-        if (bestKey && bestScore > 0) return String(user.extra_data[bestKey] || '');
       }
 
       // ── Fallback: name-related fields → user.name ───────────────────────────
