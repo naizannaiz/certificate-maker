@@ -79,23 +79,40 @@ export async function generateFilledPDF(user, template) {
 
     const getActualValue = (fieldName, user) => {
       const norm = fieldName.toLowerCase().replace(/\s+/g, '_');
-      if (norm === 'name') return user.name || '';
-      if (norm === 'certificate_id' || norm === 'certificate id')
+
+      // ── Certificate ID ──────────────────────────────────────────────────────
+      if (norm === 'certificate_id' || norm === 'certificate_id')
         return user.certificate_id || '';
+
+      // ── Date ────────────────────────────────────────────────────────────────
       if (norm === 'date') {
-        // Auto date: format as "April 23, 2026"
         return new Date().toLocaleDateString('en-US', {
           day: 'numeric', month: 'long', year: 'numeric'
         });
       }
+
+      // ── Exact extra_data key match ───────────────────────────────────────────
       if (user.extra_data && user.extra_data[fieldName] !== undefined)
         return String(user.extra_data[fieldName] || '');
-      if (user.extra_data) {
+
+      // ── Fuzzy extra_data key match ───────────────────────────────────────────
+      if (user.extra_data && Object.keys(user.extra_data).length > 0) {
         const key = Object.keys(user.extra_data).find(
-          k => k.toLowerCase() === norm || k.toLowerCase().replace(/\s+/g, '_') === norm
+          k => k.toLowerCase() === norm ||
+               k.toLowerCase().replace(/\s+/g, '_') === norm ||
+               norm.includes(k.toLowerCase().replace(/\s+/g, '_')) ||
+               k.toLowerCase().replace(/\s+/g, '_').includes(norm)
         );
-        return key ? String(user.extra_data[key] || '') : `[${fieldName}]`;
+        if (key) return String(user.extra_data[key] || '');
       }
+
+      // ── Fallback: if the field is name-related, use user.name ───────────────
+      if (norm === 'name' || norm === 'full_name' || norm === 'fullname' ||
+          norm === 'participant_name' || norm.endsWith('_name') && !norm.includes('institution') && !norm.includes('organization')) {
+        if (user.name) return user.name;
+      }
+
+      // ── Last resort fallback ─────────────────────────────────────────────────
       return `[${fieldName}]`;
     };
 
