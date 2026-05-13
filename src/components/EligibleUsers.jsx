@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { RefreshCcw, ChevronDown, ChevronRight, Users, CheckCircle2, XCircle, Search, Upload, AlertCircle, Loader2, UserMinus, FileSpreadsheet, Trash2, Pencil } from 'lucide-react';
+import { RefreshCcw, ChevronDown, ChevronRight, Users, CheckCircle2, XCircle, Search, Upload, AlertCircle, Loader2, UserMinus, FileSpreadsheet, Trash2, Pencil, UserPlus } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const NAME_KEYS  = ['name'];
@@ -34,6 +34,12 @@ function EligibleUsers() {
   const [editingUser, setEditingUser] = useState(null); // { user, group }
   const [editForm, setEditForm] = useState({});
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Add Individual User State
+  const [addUserGroup, setAddUserGroup] = useState(null); // group object
+  const [addUserForm, setAddUserForm] = useState({});
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [addUserError, setAddUserError] = useState('');
 
   // Field Mapping State for Appending
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
@@ -322,6 +328,51 @@ function EligibleUsers() {
     }
   };
 
+  const openAddUserModal = (group) => {
+    const extraCols = (group.columns || []).filter(
+      c => !['name','email','phone'].some(r => c.toLowerCase().includes(r))
+    );
+    setAddUserGroup({ ...group, extraCols });
+    setAddUserForm({
+      name: '',
+      email: '',
+      phone: '',
+      is_eligible: true,
+      ...Object.fromEntries(extraCols.map(col => [col, ''])),
+    });
+    setAddUserError('');
+  };
+
+  const handleAddUser = async () => {
+    if (!addUserGroup) return;
+    if (!addUserForm.name.trim()) { setAddUserError('Name is required.'); return; }
+    if (!addUserForm.email.trim()) { setAddUserError('Email is required.'); return; }
+    if (!addUserForm.phone.trim()) { setAddUserError('Phone is required.'); return; }
+    setIsAddingUser(true);
+    setAddUserError('');
+    try {
+      const extra_data = {};
+      addUserGroup.extraCols.forEach(col => { extra_data[col] = addUserForm[col] || ''; });
+      const { error } = await supabase.from('users').insert([{
+        name: addUserForm.name.trim(),
+        email: addUserForm.email.trim().toLowerCase(),
+        phone: addUserForm.phone.trim(),
+        is_eligible: addUserForm.is_eligible,
+        group_id: addUserGroup.id,
+        certificate_id: `CERT-${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+        extra_data,
+      }]);
+      if (error) throw error;
+      setAddUserGroup(null);
+      await fetchAll();
+    } catch (err) {
+      console.error('Error adding user:', err);
+      setAddUserError(err.message || 'Failed to add user.');
+    } finally {
+      setIsAddingUser(false);
+    }
+  };
+
   const openEditModal = (user, group) => {
     const extraCols = (group.columns || []).filter(
       c => !['name','email','phone'].some(r => c.toLowerCase().includes(r))
@@ -468,6 +519,17 @@ function EligibleUsers() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            openAddUserModal(group);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-xs font-medium transition-colors"
+                          title="Add individual user"
+                        >
+                          <UserPlus size={14} />
+                          <span className="hidden sm:inline">Add One</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setUploadingGroupId(group.id);
                             fileInputRef.current?.click();
                           }}
@@ -480,7 +542,7 @@ function EligibleUsers() {
                           ) : (
                             <Upload size={14} />
                           )}
-                          <span className="hidden sm:inline">Add Users</span>
+                          <span className="hidden sm:inline">Add Excel</span>
                         </button>
                       </div>
                     )}
@@ -563,6 +625,94 @@ function EligibleUsers() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── Add Individual User Modal ── */}
+      {addUserGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-surface-container rounded-2xl max-w-lg w-full border border-white/10 shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-headline text-on-surface flex items-center gap-2">
+                  <UserPlus size={18} className="text-primary" /> Add Individual User
+                </h3>
+                <p className="text-xs text-on-surface-variant mt-1">Adding to group: <span className="text-primary font-medium">{addUserGroup.name}</span></p>
+              </div>
+              <button onClick={() => setAddUserGroup(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-on-surface-variant">
+                <XCircle size={22} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              {addUserError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{addUserError}</div>
+              )}
+              {/* Core fields */}
+              {[['name', 'Full Name *', 'text'], ['email', 'Email Address *', 'email'], ['phone', 'Phone Number *', 'tel']].map(([field, label, type]) => (
+                <div key={field}>
+                  <label className="block text-xs uppercase tracking-wider text-on-surface-variant mb-1">{label}</label>
+                  <input
+                    type={type}
+                    value={addUserForm[field] || ''}
+                    onChange={e => { setAddUserForm(prev => ({ ...prev, [field]: e.target.value })); setAddUserError(''); }}
+                    className="w-full bg-surface-container-highest/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none transition-colors"
+                    placeholder={`Enter ${label.replace(' *', '')}...`}
+                  />
+                </div>
+              ))}
+
+              {/* Eligible toggle */}
+              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                <span className="text-sm text-on-surface">Eligible for Certificate</span>
+                <button
+                  onClick={() => setAddUserForm(prev => ({ ...prev, is_eligible: !prev.is_eligible }))}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${addUserForm.is_eligible ? 'bg-primary' : 'bg-white/20'}`}
+                >
+                  <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${addUserForm.is_eligible ? 'left-6' : 'left-1'}`} />
+                </button>
+              </div>
+
+              {/* Extra / certificate fields */}
+              {addUserGroup.extraCols.length > 0 && (
+                <div className="pt-3 border-t border-white/5 space-y-3">
+                  <p className="text-xs text-secondary font-medium uppercase tracking-wider">Certificate Fields</p>
+                  {addUserGroup.extraCols.map(col => (
+                    <div key={col}>
+                      <label className="block text-xs uppercase tracking-wider text-on-surface-variant mb-1">{col}</label>
+                      <input
+                        type="text"
+                        value={addUserForm[col] || ''}
+                        onChange={e => setAddUserForm(prev => ({ ...prev, [col]: e.target.value }))}
+                        className="w-full bg-surface-container-highest/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none transition-colors"
+                        placeholder={`Enter ${col}...`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-white/5 flex justify-end gap-3 bg-surface-container">
+              <button
+                onClick={() => setAddUserGroup(null)}
+                className="px-5 py-2.5 rounded-xl text-sm text-on-surface hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddUser}
+                disabled={isAddingUser}
+                className="px-5 py-2.5 rounded-xl text-sm bg-primary hover:bg-primary/90 text-on-primary font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {isAddingUser ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                Add User
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
